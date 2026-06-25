@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.1</title>
+  <title>Sky Cardboard VR v0.3.2</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -274,8 +274,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.1</h1>
-      <div class="sub">Стабільна версія без мобільних екранних кнопок. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.2</h1>
+      <div class="sub">Виправлена версія: джойстик працює і в меню, і в режимі перегляду. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -344,7 +344,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v031') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v032') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -360,7 +360,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v031', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v032', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -497,6 +497,7 @@
 
   function openMenu() {
     state.menuOpen = true;
+    lastButtonState = {};
     toastEl.classList.remove('show');
     menuEl.classList.add('open');
     menuEl.setAttribute('aria-hidden', 'false');
@@ -685,6 +686,9 @@
 
   function applyMovement(dt, now) {
     if (state.menuOpen) {
+      // Important: even when the sky is paused by the menu,
+      // we must still poll the gamepad so D-pad/stick/A/B can control the menu.
+      gamepadVector(now);
       updateHud();
       return;
     }

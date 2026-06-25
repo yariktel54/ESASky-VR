@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.3</title>
+  <title>Sky Cardboard VR v0.3.4</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -274,8 +274,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.3</h1>
-      <div class="sub">Спрощена версія: X/Y напряму змінюють Eye gap без меню. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.4</h1>
+      <div class="sub">Версія з керованим псевдопаралаксом: X/Y змінюють Parallax, LB/RB змінюють Eye gap. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -314,6 +314,7 @@
     fov: targets[0].fov,
     speed: 0.55,
     eyeGap: 8,
+    parallax: 0.012,
     surveyIndex: 0,
     targetIndex: 0,
     grid: false,
@@ -344,7 +345,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v033') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v034') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -353,6 +354,7 @@
     state.fov = clamp(Number(state.fov) || targets[0].fov, 0.01, 180);
     state.speed = clamp(Number(state.speed) || 0.55, 0.05, 5);
     state.eyeGap = clamp(Number(state.eyeGap) || 8, 0, 160);
+    state.parallax = clamp(Number.isFinite(Number(state.parallax)) ? Number(state.parallax) : 0.012, -0.06, 0.06);
     state.surveyIndex = clamp(Number(state.surveyIndex) || 0, 0, surveys.length - 1);
     state.targetIndex = clamp(Number(state.targetIndex) || 0, 0, targets.length - 1);
     state.grid = !!state.grid;
@@ -360,12 +362,13 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v033', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v034', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
       speed: state.speed,
       eyeGap: state.eyeGap,
+      parallax: state.parallax,
       surveyIndex: state.surveyIndex,
       targetIndex: state.targetIndex,
       grid: state.grid,
@@ -386,6 +389,15 @@
     toast('Eye gap: ' + state.eyeGap.toFixed(0) + ' px');
   }
 
+  function changeParallax(delta) {
+    state.parallax = clamp(state.parallax + delta, -0.06, 0.06);
+    toast('Parallax: ' + (state.parallax * 100).toFixed(1) + '%');
+    updateHud();
+    renderMenu();
+    syncView(true);
+    saveState();
+  }
+
   function toast(msg) {
     if (state.menuOpen) return;
     toastEl.textContent = msg;
@@ -396,7 +408,7 @@
 
   function updateHud() {
     microHudEl.textContent =
-      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · ${surveys[state.surveyIndex].name}` +
+      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · Parallax ${(state.parallax*100).toFixed(1)}% · ${surveys[state.surveyIndex].name}` +
       (state.padName ? ` · 🎮 ${state.padName.slice(0, 22)}` : '');
     microHudEl.classList.toggle('visible', !!state.hudVisible);
   }
@@ -430,10 +442,18 @@
     if (!force && now - state.lastSend < 70) return;
     state.lastSend = now;
 
-    for (const al of [leftAladin, rightAladin]) {
+    const cosDec = Math.max(0.18, Math.cos(state.dec * Math.PI / 180));
+    const halfRaOffset = (state.fov * state.parallax * 0.5) / cosDec;
+
+    const views = [
+      { al: leftAladin,  ra: wrapRa(state.ra - halfRaOffset), dec: state.dec, fov: state.fov },
+      { al: rightAladin, ra: wrapRa(state.ra + halfRaOffset), dec: state.dec, fov: state.fov }
+    ];
+
+    for (const view of views) {
       try {
-        al.gotoRaDec(state.ra, state.dec);
-        al.setFoV(state.fov);
+        view.al.gotoRaDec(view.ra, view.dec);
+        view.al.setFoV(view.fov);
       } catch (e) {
         console.warn(e);
       }
@@ -521,11 +541,12 @@
     { name: 'Шар', value: () => surveys[state.surveyIndex].name, hint: '← →', edit: dir => setSurvey(state.surveyIndex + dir), action: () => setSurvey(state.surveyIndex + 1) },
     { name: 'Швидкість', value: () => state.speed.toFixed(2) + '×', hint: '← →', edit: dir => { state.speed = clamp(Math.round((state.speed + dir * 0.05) * 100) / 100, 0.05, 5); updateHud(); renderMenu(); saveState(); } },
     { name: 'FoV', value: () => state.fov.toFixed(2) + '°', hint: '← →', edit: dir => { state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180); syncView(true); renderMenu(); } },
-    { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => setEyeGap(state.eyeGap + dir * 2) },
+    { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => changeEyeGap(dir * 2) },
+    { name: 'Parallax', value: () => (state.parallax * 100).toFixed(1) + '%', hint: '← →', edit: dir => changeParallax(dir * 0.002) },
     { name: 'Сітка', value: () => state.grid ? 'on' : 'off', hint: 'A', action: () => toggleGrid() },
     { name: 'Micro HUD', value: () => state.hudVisible ? 'on' : 'off', hint: 'A', action: () => toggleHud() },
     { name: 'Fullscreen', value: () => document.fullscreenElement ? 'on' : 'off', hint: 'A', action: () => fullscreen() },
-    { name: 'Скинути VR', value: () => 'Gap 8 px, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.hudVisible = false; setEyeGap(8); updateHud(); renderMenu(); saveState(); } }
+    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.hudVisible = false; setEyeGap(8); syncView(true); updateHud(); renderMenu(); saveState(); } }
   ];
 
   function renderMenu() {
@@ -673,10 +694,10 @@
 
     if (edgeButton(pad, 0)) openMenu();
     if (edgeButton(pad, 1)) toggleGrid();
-    if (edgeButton(pad, 2)) changeEyeGap(-2); // X: smaller eye gap
-    if (edgeButton(pad, 3)) changeEyeGap(2);  // Y: larger eye gap
-    if (edgeButton(pad, 4)) goTarget(state.targetIndex - 1);
-    if (edgeButton(pad, 5)) goTarget(state.targetIndex + 1);
+    if (edgeButton(pad, 2)) changeParallax(-0.002); // X: less parallax
+    if (edgeButton(pad, 3)) changeParallax(0.002);  // Y: more parallax
+    if (edgeButton(pad, 4)) changeEyeGap(-2);        // LB: smaller eye gap
+    if (edgeButton(pad, 5)) changeEyeGap(2);         // RB: larger eye gap
     if (edgeButton(pad, 8)) toggleHud();
     if (edgeButton(pad, 9)) fullscreen();
 
@@ -759,8 +780,10 @@
 
     if (key === 'h') toggleHud();
     if (key === 'g') toggleGrid();
-    if (key === 'x') changeEyeGap(-2);
-    if (key === 'y') changeEyeGap(2);
+    if (key === 'x') changeParallax(-0.002);
+    if (key === 'y') changeParallax(0.002);
+    if (key === '[') changeEyeGap(-2);
+    if (key === ']') changeEyeGap(2);
     if (key === 'q') setSurvey(state.surveyIndex - 1);
     if (key === 'e') setSurvey(state.surveyIndex + 1);
   });

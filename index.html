@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3</title>
+  <title>Sky Cardboard VR v0.3.1</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -46,7 +46,7 @@
     .viewer {
       width: 100%;
       height: 100%;
-      pointer-events: none; /* only the shared joystick state controls the sky */
+      pointer-events: none;
       background: #000;
     }
 
@@ -54,7 +54,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 49%, rgba(0,0,0,.14) 73%, rgba(0,0,0,.58) 100%);
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.12) 74%, rgba(0,0,0,.56) 100%);
     }
 
     .crosshair {
@@ -65,7 +65,7 @@
       height: 24px;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      opacity: .38;
+      opacity: .36;
     }
 
     .crosshair:before,
@@ -80,17 +80,10 @@
     .crosshair:after { left: 0; top: 11px; width: 24px; height: 2px; }
 
     /*
-      Aladin Lite adds small UI widgets inside each viewer:
-      coordinates, layer button, frame dropdown, logo, etc.
-      In Cardboard mode they are useless and interfere with each eye,
-      so we hide them aggressively while keeping canvas/image rendering visible.
+      Conservative Aladin UI hiding.
+      No MutationObserver and no repeated DOM rewriting in v0.3.1.
+      The canvas/tile layers are not touched.
     */
-    .viewer button,
-    .viewer select,
-    .viewer input,
-    .viewer textarea,
-    .viewer a,
-    .viewer label,
     .viewer .aladin-location,
     .viewer .aladin-fov,
     .viewer .aladin-frameChoice,
@@ -98,7 +91,6 @@
     .viewer .aladin-cooFrame,
     .viewer .aladin-coordinates,
     .viewer .aladin-coordinate,
-    .viewer .aladin-cm,
     .viewer .aladin-layerBox,
     .viewer .aladin-layer-box,
     .viewer .aladin-layersControl,
@@ -116,11 +108,12 @@
     .viewer .aladin-context-menu,
     .viewer .aladin-popup,
     .viewer .aladin-tooltip,
-    .viewer .aladin-measurement-table {
+    .viewer .aladin-measurement-table,
+    .viewer .aladin-control,
+    .viewer .aladin-controls {
       display: none !important;
       visibility: hidden !important;
       pointer-events: none !important;
-      opacity: 0 !important;
     }
 
     #microHud {
@@ -143,6 +136,23 @@
     }
 
     #microHud.visible { display: block; }
+
+    #loading {
+      position: absolute;
+      z-index: 19;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(0,0,0,.62);
+      color: rgba(255,255,255,.82);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    #loading.hide { display: none; }
 
     #menu {
       position: absolute;
@@ -259,12 +269,13 @@
     </div>
   </div>
 
+  <div id="loading">Loading sky…</div>
   <div id="microHud"></div>
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3</h1>
-      <div class="sub">Чистий режим для фізичного джойстика. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами екрана.</div>
+      <h1>Sky Cardboard VR v0.3.1</h1>
+      <div class="sub">Стабільна версія без мобільних екранних кнопок. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -333,7 +344,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v03') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v031') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -349,7 +360,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v03', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v031', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -375,7 +386,7 @@
     toastEl.textContent = msg;
     toastEl.classList.add('show');
     clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => toastEl.classList.remove('show'), 800);
+    state.toastTimer = setTimeout(() => toastEl.classList.remove('show'), 700);
   }
 
   function updateHud() {
@@ -385,41 +396,23 @@
     microHudEl.classList.toggle('visible', !!state.hudVisible);
   }
 
-  function hideAladinChrome(root) {
-    if (!root) return;
-
+  function oneTimeHideKnownChrome() {
     const selectors = [
-      'button', 'select', 'input', 'textarea', 'label', 'a',
       '.aladin-location', '.aladin-fov', '.aladin-frameChoice', '.aladin-frame-choice',
-      '.aladin-cooFrame', '.aladin-coordinates', '.aladin-coordinate', '.aladin-cm',
+      '.aladin-cooFrame', '.aladin-coordinates', '.aladin-coordinate',
       '.aladin-layerBox', '.aladin-layer-box', '.aladin-layersControl', '.aladin-layers-control',
-      '.aladin-stack-control', '.aladin-toolbar', '.aladin-statusBar', '.aladin-status-bar',
+      '.aladin-toolbar', '.aladin-statusBar', '.aladin-status-bar',
       '.aladin-logo', '.aladin-share', '.aladin-fullscreen', '.aladin-projection',
-      '.aladin-grid', '.aladin-reticleColor', '.aladin-context-menu', '.aladin-popup',
-      '.aladin-tooltip', '.aladin-measurement-table'
-    ];
+      '.aladin-context-menu', '.aladin-popup', '.aladin-tooltip'
+    ].join(',');
 
-    root.querySelectorAll(selectors.join(',')).forEach(el => {
-      el.style.setProperty('display', 'none', 'important');
-      el.style.setProperty('visibility', 'hidden', 'important');
-      el.style.setProperty('pointer-events', 'none', 'important');
-      el.style.setProperty('opacity', '0', 'important');
-      el.setAttribute('aria-hidden', 'true');
-      el.tabIndex = -1;
-    });
-  }
-
-  function installChromeCleaner() {
-    const roots = [$('left'), $('right')];
-
-    const clean = () => roots.forEach(hideAladinChrome);
-    clean();
-    setInterval(clean, 900);
-
-    roots.forEach(root => {
-      const obs = new MutationObserver(clean);
-      obs.observe(root, { childList: true, subtree: true, attributes: true });
-    });
+    for (const root of [$('left'), $('right')]) {
+      root.querySelectorAll(selectors).forEach(el => {
+        el.style.display = 'none';
+        el.style.visibility = 'hidden';
+        el.style.pointerEvents = 'none';
+      });
+    }
   }
 
   function syncView(force = false) {
@@ -429,18 +422,13 @@
     }
 
     const now = performance.now();
-    if (!force && now - state.lastSend < 55) return;
+    if (!force && now - state.lastSend < 70) return;
     state.lastSend = now;
-
-    // Both eyes receive exactly the same metrics.
-    const commonRa = state.ra;
-    const commonDec = state.dec;
-    const commonFov = state.fov;
 
     for (const al of [leftAladin, rightAladin]) {
       try {
-        al.gotoRaDec(commonRa, commonDec);
-        al.setFoV(commonFov);
+        al.gotoRaDec(state.ra, state.dec);
+        al.setFoV(state.fov);
       } catch (e) {
         console.warn(e);
       }
@@ -473,7 +461,6 @@
     state.dec = clamp(t.dec, -89.9, 89.9);
     state.fov = clamp(t.fov, 0.01, 180);
 
-    toast(t.name);
     syncView(true);
     renderMenu();
   }
@@ -523,84 +510,16 @@
   }
 
   const menuSchema = [
-    {
-      name: 'Продовжити',
-      value: () => 'закрити меню',
-      hint: 'A',
-      action: () => closeMenu()
-    },
-    {
-      name: 'Об’єкт',
-      value: () => targets[state.targetIndex].name,
-      hint: '← →',
-      edit: dir => goTarget(state.targetIndex + dir),
-      action: () => goTarget(state.targetIndex + 1)
-    },
-    {
-      name: 'Шар',
-      value: () => surveys[state.surveyIndex].name,
-      hint: '← →',
-      edit: dir => setSurvey(state.surveyIndex + dir),
-      action: () => setSurvey(state.surveyIndex + 1)
-    },
-    {
-      name: 'Швидкість',
-      value: () => state.speed.toFixed(2) + '×',
-      hint: '← →',
-      edit: dir => {
-        state.speed = clamp(Math.round((state.speed + dir * 0.05) * 100) / 100, 0.05, 5);
-        updateHud();
-        renderMenu();
-        saveState();
-      }
-    },
-    {
-      name: 'FoV',
-      value: () => state.fov.toFixed(2) + '°',
-      hint: '← →',
-      edit: dir => {
-        state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180);
-        syncView(true);
-        renderMenu();
-      }
-    },
-    {
-      name: 'Eye gap',
-      value: () => state.eyeGap.toFixed(0) + ' px',
-      hint: '← →',
-      edit: dir => setEyeGap(state.eyeGap + dir * 2)
-    },
-    {
-      name: 'Сітка',
-      value: () => state.grid ? 'on' : 'off',
-      hint: 'A',
-      action: () => toggleGrid()
-    },
-    {
-      name: 'Micro HUD',
-      value: () => state.hudVisible ? 'on' : 'off',
-      hint: 'A',
-      action: () => toggleHud()
-    },
-    {
-      name: 'Fullscreen',
-      value: () => document.fullscreenElement ? 'on' : 'off',
-      hint: 'A',
-      action: () => fullscreen()
-    },
-    {
-      name: 'Скинути VR',
-      value: () => 'Gap 8 px, speed 0.55×',
-      hint: 'A',
-      action: () => {
-        state.speed = 0.55;
-        setEyeGap(8);
-        state.hudVisible = false;
-        updateHud();
-        renderMenu();
-        saveState();
-      }
-    }
+    { name: 'Продовжити', value: () => 'закрити меню', hint: 'A', action: () => closeMenu() },
+    { name: 'Об’єкт', value: () => targets[state.targetIndex].name, hint: '← →', edit: dir => goTarget(state.targetIndex + dir), action: () => goTarget(state.targetIndex + 1) },
+    { name: 'Шар', value: () => surveys[state.surveyIndex].name, hint: '← →', edit: dir => setSurvey(state.surveyIndex + dir), action: () => setSurvey(state.surveyIndex + 1) },
+    { name: 'Швидкість', value: () => state.speed.toFixed(2) + '×', hint: '← →', edit: dir => { state.speed = clamp(Math.round((state.speed + dir * 0.05) * 100) / 100, 0.05, 5); updateHud(); renderMenu(); saveState(); } },
+    { name: 'FoV', value: () => state.fov.toFixed(2) + '°', hint: '← →', edit: dir => { state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180); syncView(true); renderMenu(); } },
+    { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => setEyeGap(state.eyeGap + dir * 2) },
+    { name: 'Сітка', value: () => state.grid ? 'on' : 'off', hint: 'A', action: () => toggleGrid() },
+    { name: 'Micro HUD', value: () => state.hudVisible ? 'on' : 'off', hint: 'A', action: () => toggleHud() },
+    { name: 'Fullscreen', value: () => document.fullscreenElement ? 'on' : 'off', hint: 'A', action: () => fullscreen() },
+    { name: 'Скинути VR', value: () => 'Gap 8 px, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.hudVisible = false; setEyeGap(8); updateHud(); renderMenu(); saveState(); } }
   ];
 
   function renderMenu() {
@@ -610,11 +529,7 @@
     menuSchema.forEach((row, i) => {
       const div = document.createElement('div');
       div.className = 'menu-row' + (i === state.menuIndex ? ' focus' : '');
-      div.innerHTML = `
-        <div class="name">${row.name}</div>
-        <div class="value">${row.value()}</div>
-        <div class="hint">${row.hint || ''}</div>
-      `;
+      div.innerHTML = `<div class="name">${row.name}</div><div class="value">${row.value()}</div><div class="hint">${row.hint || ''}</div>`;
       menuRowsEl.appendChild(div);
     });
   }
@@ -653,39 +568,40 @@
         showFullscreenControl: false,
         showShareControl: false,
         showSimbadPointerControl: false,
-        showContextMenu: false,
-        showFrame: false,
-        showCooGrid: state.grid
+        showContextMenu: false
       };
 
       leftAladin = A.aladin('#left', opts);
       rightAladin = A.aladin('#right', opts);
       state.ready = true;
 
-      installChromeCleaner();
       setEyeGap(state.eyeGap);
       setSurvey(state.surveyIndex);
 
       setTimeout(() => {
-        hideAladinChrome($('left'));
-        hideAladinChrome($('right'));
+        oneTimeHideKnownChrome();
         syncView(true);
-      }, 700);
+        $('loading').classList.add('hide');
+      }, 1100);
+
+      // A second one-time pass is safe and avoids endless DOM mutation loops.
+      setTimeout(oneTimeHideKnownChrome, 2600);
 
       requestAnimationFrame(loop);
+    }).catch(err => {
+      console.error(err);
+      $('loading').textContent = 'Aladin Lite не завантажився. Перевір інтернет / блокування CDN.';
     });
   }
 
   function keyboardVector() {
     let x = 0, y = 0, z = 0;
-
     if (state.keys.has('arrowleft') || state.keys.has('a')) x -= 1;
     if (state.keys.has('arrowright') || state.keys.has('d')) x += 1;
     if (state.keys.has('arrowup') || state.keys.has('w')) y -= 1;
     if (state.keys.has('arrowdown') || state.keys.has('s')) y += 1;
     if (state.keys.has('+') || state.keys.has('=') || state.keys.has('pageup')) z -= 1;
     if (state.keys.has('-') || state.keys.has('_') || state.keys.has('pagedown')) z += 1;
-
     return { x, y, z };
   }
 
@@ -694,13 +610,8 @@
     return [...pads].find(p => p && p.connected) || null;
   }
 
-  function buttonPressed(pad, idx) {
-    return !!pad?.buttons?.[idx]?.pressed;
-  }
-
-  function buttonValue(pad, idx) {
-    return Number(pad?.buttons?.[idx]?.value || 0);
-  }
+  function buttonPressed(pad, idx) { return !!pad?.buttons?.[idx]?.pressed; }
+  function buttonValue(pad, idx) { return Number(pad?.buttons?.[idx]?.value || 0); }
 
   function edgeButton(pad, idx) {
     const key = String(idx);
@@ -748,22 +659,22 @@
         menuEdit(editX);
       }
 
-      if (edgeButton(pad, 0)) menuAction(); // A
-      if (edgeButton(pad, 1)) closeMenu();  // B
+      if (edgeButton(pad, 0)) menuAction();
+      if (edgeButton(pad, 1)) closeMenu();
 
       return { x: 0, y: 0, z: 0 };
     }
 
-    if (edgeButton(pad, 0)) openMenu();       // A
-    if (edgeButton(pad, 1)) toggleGrid();     // B
-    if (edgeButton(pad, 2)) setSurvey(state.surveyIndex - 1); // X
-    if (edgeButton(pad, 3)) setSurvey(state.surveyIndex + 1); // Y
-    if (edgeButton(pad, 4)) goTarget(state.targetIndex - 1);  // LB
-    if (edgeButton(pad, 5)) goTarget(state.targetIndex + 1);  // RB
-    if (edgeButton(pad, 8)) toggleHud();       // Select/Back
-    if (edgeButton(pad, 9)) fullscreen();      // Start
+    if (edgeButton(pad, 0)) openMenu();
+    if (edgeButton(pad, 1)) toggleGrid();
+    if (edgeButton(pad, 2)) setSurvey(state.surveyIndex - 1);
+    if (edgeButton(pad, 3)) setSurvey(state.surveyIndex + 1);
+    if (edgeButton(pad, 4)) goTarget(state.targetIndex - 1);
+    if (edgeButton(pad, 5)) goTarget(state.targetIndex + 1);
+    if (edgeButton(pad, 8)) toggleHud();
+    if (edgeButton(pad, 9)) fullscreen();
 
-    let z = ry + buttonValue(pad, 6) - buttonValue(pad, 7); // right stick + LT/RT
+    const z = ry + buttonValue(pad, 6) - buttonValue(pad, 7);
 
     return {
       x: clamp(lx + dLeft + dRight, -1, 1),
@@ -781,9 +692,9 @@
     const k = keyboardVector();
     const g = gamepadVector(now);
 
-    let x = clamp(k.x + g.x, -1, 1);
-    let y = clamp(k.y + g.y, -1, 1);
-    let z = clamp(k.z + g.z, -1.5, 1.5);
+    const x = clamp(k.x + g.x, -1, 1);
+    const y = clamp(k.y + g.y, -1, 1);
+    const z = clamp(k.z + g.z, -1.5, 1.5);
 
     if (Math.abs(x) + Math.abs(y) + Math.abs(z) < 0.001) {
       updateHud();
@@ -806,10 +717,8 @@
 
   function loop(t) {
     if (!loop.last) loop.last = t;
-
     const dt = Math.min(0.08, (t - loop.last) / 1000);
     loop.last = t;
-
     applyMovement(dt, t);
     requestAnimationFrame(loop);
   }

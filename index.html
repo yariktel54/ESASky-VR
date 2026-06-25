@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.4</title>
+  <title>Sky Cardboard VR v0.3.5</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -65,7 +65,13 @@
       height: 24px;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      opacity: .36;
+      opacity: 0;
+      transition: opacity .8s ease;
+    }
+
+    .crosshair.active {
+      opacity: .38;
+      transition: opacity .08s linear;
     }
 
     .crosshair:before,
@@ -274,8 +280,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.4</h1>
-      <div class="sub">Версія з керованим псевдопаралаксом: X/Y змінюють Parallax, LB/RB змінюють Eye gap. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.5</h1>
+      <div class="sub">Версія з тимчасовим кросхейром: він з’являється тільки при зміні Parallax або Eye gap. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -327,7 +333,8 @@
     padName: '',
     lastNav: 0,
     lastEdit: 0,
-    toastTimer: null
+    toastTimer: null,
+    crosshairTimer: null
   };
 
   const $ = (id) => document.getElementById(id);
@@ -345,7 +352,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v034') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v035') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -362,7 +369,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v034', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v035', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -376,6 +383,14 @@
     }));
   }
 
+  function showCrosshair() {
+    document.querySelectorAll('.crosshair').forEach(el => el.classList.add('active'));
+    clearTimeout(state.crosshairTimer);
+    state.crosshairTimer = setTimeout(() => {
+      document.querySelectorAll('.crosshair').forEach(el => el.classList.remove('active'));
+    }, 2000);
+  }
+
   function setEyeGap(px) {
     state.eyeGap = clamp(Number(px) || 0, 0, 160);
     document.documentElement.style.setProperty('--eye-gap', state.eyeGap + 'px');
@@ -386,11 +401,13 @@
 
   function changeEyeGap(delta) {
     setEyeGap(state.eyeGap + delta);
+    showCrosshair();
     toast('Eye gap: ' + state.eyeGap.toFixed(0) + ' px');
   }
 
   function changeParallax(delta) {
     state.parallax = clamp(state.parallax + delta, -0.06, 0.06);
+    showCrosshair();
     toast('Parallax: ' + (state.parallax * 100).toFixed(1) + '%');
     updateHud();
     renderMenu();
@@ -546,7 +563,7 @@
     { name: 'Сітка', value: () => state.grid ? 'on' : 'off', hint: 'A', action: () => toggleGrid() },
     { name: 'Micro HUD', value: () => state.hudVisible ? 'on' : 'off', hint: 'A', action: () => toggleHud() },
     { name: 'Fullscreen', value: () => document.fullscreenElement ? 'on' : 'off', hint: 'A', action: () => fullscreen() },
-    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.hudVisible = false; setEyeGap(8); syncView(true); updateHud(); renderMenu(); saveState(); } }
+    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.hudVisible = false; setEyeGap(8); showCrosshair(); syncView(true); updateHud(); renderMenu(); saveState(); } }
   ];
 
   function renderMenu() {

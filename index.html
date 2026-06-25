@@ -3,15 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.2 — joystick friendly</title>
+  <title>Sky Cardboard VR v0.3</title>
   <style>
     :root {
       --eye-gap: 8px;
-      --panel: rgba(0,0,0,.72);
-      --panel2: rgba(20,20,20,.88);
-      --line: rgba(255,255,255,.24);
+      --panel: rgba(18,18,18,.92);
+      --line: rgba(255,255,255,.22);
       --text: #f5f5f5;
-      --muted: rgba(255,255,255,.72);
+      --muted: rgba(255,255,255,.68);
       --focus: rgba(255,255,255,.96);
     }
 
@@ -23,8 +22,8 @@
       background: #000;
       color: var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      overscroll-behavior: none;
       user-select: none;
+      overscroll-behavior: none;
     }
 
     #app { position: fixed; inset: 0; background: #000; }
@@ -42,70 +41,108 @@
       position: relative;
       overflow: hidden;
       background: #000;
-      border: 0;
     }
 
     .viewer {
       width: 100%;
       height: 100%;
-      pointer-events: none; /* joystick-first: avoid accidental desync by mouse/touch */
+      pointer-events: none; /* only the shared joystick state controls the sky */
+      background: #000;
     }
 
     .mask {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,.16) 72%, rgba(0,0,0,.58) 100%);
+      background: radial-gradient(ellipse at center, transparent 49%, rgba(0,0,0,.14) 73%, rgba(0,0,0,.58) 100%);
     }
 
     .crosshair {
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      opacity: .48;
+      opacity: .38;
     }
 
     .crosshair:before,
     .crosshair:after {
       content: "";
       position: absolute;
-      background: rgba(255,255,255,.62);
+      background: rgba(255,255,255,.56);
       border-radius: 2px;
     }
 
-    .crosshair:before { left: 12px; top: 0; width: 2px; height: 26px; }
-    .crosshair:after { left: 0; top: 12px; width: 26px; height: 2px; }
+    .crosshair:before { left: 11px; top: 0; width: 2px; height: 24px; }
+    .crosshair:after { left: 0; top: 11px; width: 24px; height: 2px; }
 
-    #hud {
-      position: absolute;
-      z-index: 20;
-      left: 50%;
-      bottom: 12px;
-      transform: translateX(-50%);
-      min-width: min(860px, calc(100vw - 24px));
-      box-sizing: border-box;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: center;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: var(--panel);
-      backdrop-filter: blur(8px);
-      font-size: 14px;
-      line-height: 1.25;
-      opacity: .94;
+    /*
+      Aladin Lite adds small UI widgets inside each viewer:
+      coordinates, layer button, frame dropdown, logo, etc.
+      In Cardboard mode they are useless and interfere with each eye,
+      so we hide them aggressively while keeping canvas/image rendering visible.
+    */
+    .viewer button,
+    .viewer select,
+    .viewer input,
+    .viewer textarea,
+    .viewer a,
+    .viewer label,
+    .viewer .aladin-location,
+    .viewer .aladin-fov,
+    .viewer .aladin-frameChoice,
+    .viewer .aladin-frame-choice,
+    .viewer .aladin-cooFrame,
+    .viewer .aladin-coordinates,
+    .viewer .aladin-coordinate,
+    .viewer .aladin-cm,
+    .viewer .aladin-layerBox,
+    .viewer .aladin-layer-box,
+    .viewer .aladin-layersControl,
+    .viewer .aladin-layers-control,
+    .viewer .aladin-stack-control,
+    .viewer .aladin-toolbar,
+    .viewer .aladin-statusBar,
+    .viewer .aladin-status-bar,
+    .viewer .aladin-logo,
+    .viewer .aladin-share,
+    .viewer .aladin-fullscreen,
+    .viewer .aladin-projection,
+    .viewer .aladin-grid,
+    .viewer .aladin-reticleColor,
+    .viewer .aladin-context-menu,
+    .viewer .aladin-popup,
+    .viewer .aladin-tooltip,
+    .viewer .aladin-measurement-table {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      opacity: 0 !important;
     }
 
-    #hud .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-    #hud .item { white-space: nowrap; color: var(--muted); }
-    #hud b { color: #fff; font-weight: 650; }
-    #hud .controls { font-size: 12px; color: var(--muted); text-align: right; }
+    #microHud {
+      position: absolute;
+      z-index: 18;
+      left: 50%;
+      top: 10px;
+      transform: translateX(-50%);
+      display: none;
+      max-width: calc(100vw - 20px);
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(0,0,0,.62);
+      backdrop-filter: blur(7px);
+      color: rgba(255,255,255,.86);
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #microHud.visible { display: block; }
 
     #menu {
       position: absolute;
@@ -114,45 +151,41 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,.26);
-      backdrop-filter: blur(1px);
+      background: rgba(0,0,0,.22);
     }
 
     #menu.open { display: flex; }
 
     #panel {
-      width: min(900px, calc(100vw - 24px));
-      max-height: min(760px, calc(100vh - 24px));
-      overflow: hidden;
+      width: min(900px, calc(100vw - 28px));
+      max-height: min(760px, calc(100vh - 28px));
       box-sizing: border-box;
+      overflow: hidden;
       padding: 18px;
       border-radius: 24px;
       border: 1px solid rgba(255,255,255,.28);
-      background: var(--panel2);
-      box-shadow: 0 16px 48px rgba(0,0,0,.6);
+      background: var(--panel);
+      box-shadow: 0 16px 48px rgba(0,0,0,.66);
     }
 
     #panel h1 {
       margin: 0 0 8px 0;
-      font-size: clamp(22px, 4vw, 38px);
+      font-size: clamp(22px, 4vw, 36px);
       line-height: 1;
       font-weight: 760;
     }
 
     #panel .sub {
       color: var(--muted);
-      font-size: clamp(13px, 2vw, 17px);
+      font-size: clamp(13px, 2vw, 16px);
       margin-bottom: 14px;
     }
 
-    #menuRows {
-      display: grid;
-      gap: 8px;
-    }
+    #menuRows { display: grid; gap: 8px; }
 
     .menu-row {
       display: grid;
-      grid-template-columns: minmax(160px, 1fr) minmax(160px, 1.1fr) auto;
+      grid-template-columns: minmax(150px, 1fr) minmax(140px, .95fr) auto;
       gap: 12px;
       align-items: center;
       padding: 13px 14px;
@@ -166,12 +199,12 @@
       color: #000;
       background: var(--focus);
       border-color: #fff;
-      box-shadow: 0 0 0 4px rgba(255,255,255,.18);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.16);
     }
 
     .menu-row .name { font-weight: 720; }
     .menu-row .value { text-align: right; font-variant-numeric: tabular-nums; }
-    .menu-row .hint { color: inherit; opacity: .65; font-size: .72em; white-space: nowrap; }
+    .menu-row .hint { opacity: .65; font-size: .72em; white-space: nowrap; }
 
     #menuHelp {
       margin-top: 14px;
@@ -187,82 +220,27 @@
       position: absolute;
       z-index: 50;
       left: 50%;
-      top: 18px;
+      top: 12px;
       transform: translateX(-50%);
-      padding: 10px 14px;
+      max-width: calc(100vw - 20px);
+      padding: 9px 12px;
       border: 1px solid rgba(255,255,255,.24);
-      border-radius: 14px;
-      background: rgba(0,0,0,.75);
+      border-radius: 13px;
+      background: rgba(0,0,0,.72);
+      color: rgba(255,255,255,.9);
+      font-size: 13px;
       opacity: 0;
       transition: opacity .18s linear;
       pointer-events: none;
-      font-size: 14px;
+      white-space: nowrap;
     }
 
     #toast.show { opacity: 1; }
 
-    #touchPad {
-      position: absolute;
-      z-index: 35;
-      left: 14px;
-      bottom: 14px;
-      width: 132px;
-      height: 132px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(255,255,255,.055);
-      touch-action: none;
-      display: none;
-    }
-
-    #touchKnob {
-      position: absolute;
-      left: 46px;
-      top: 46px;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.42);
-      box-shadow: 0 0 18px rgba(255,255,255,.2);
-    }
-
-    #touchZoom {
-      position: absolute;
-      z-index: 35;
-      right: 14px;
-      bottom: 14px;
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    #touchZoom button,
-    #touchMenu {
-      width: 62px;
-      height: 62px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(255,255,255,.09);
-      color: #fff;
-      font-size: 26px;
-    }
-
-    #touchMenu { font-size: 16px; }
-
-    @media (max-width: 920px) {
-      #hud {
-        top: 8px;
-        bottom: auto;
-        font-size: 11px;
-        padding: 7px 9px;
-        min-width: calc(100vw - 16px);
-      }
-      #hud .controls { display: none; }
-      #touchPad, #touchZoom { display: flex; }
-      .menu-row {
-        grid-template-columns: minmax(120px, 1fr) minmax(105px, .8fr);
-      }
+    @media (max-width: 900px) {
+      .menu-row { grid-template-columns: minmax(120px, 1fr) minmax(105px, .8fr); }
       .menu-row .hint { display: none; }
+      #microHud { font-size: 10px; top: 7px; }
     }
   </style>
 </head>
@@ -281,43 +259,23 @@
     </div>
   </div>
 
-  <div id="hud">
-    <div class="row">
-      <span class="item"><b id="targetName">M31</b></span>
-      <span class="item">RA <b id="raTxt">10.685</b></span>
-      <span class="item">Dec <b id="decTxt">41.269</b></span>
-      <span class="item">FoV <b id="fovTxt">6.00°</b></span>
-      <span class="item">Gap <b id="gapTxt">8 px</b></span>
-      <span class="item">Layer <b id="layerTxt">DSS2 color</b></span>
-      <span class="item" id="padTxt">🎮 —</span>
-    </div>
-    <div class="controls">
-      A/Enter — меню · left stick — рух · right stick/LT/RT — zoom · B — сітка · X/Y — шари
-    </div>
-  </div>
+  <div id="microHud"></div>
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.2</h1>
-      <div class="sub">Повністю джойстик-френдлі режим. Дві картинки синхронні: однакові RA/Dec, FoV і шар; <b>Eye gap</b> змінює лише відстань між половинами екрана.</div>
+      <h1>Sky Cardboard VR v0.3</h1>
+      <div class="sub">Чистий режим для фізичного джойстика. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами екрана.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
         <span>←→ / лівий стик — змінити</span>
-        <span>A / Enter — вибрати</span>
-        <span>B / Esc — закрити</span>
+        <span>A — вибрати</span>
+        <span>B — закрити</span>
       </div>
     </div>
   </div>
 
   <div id="toast"></div>
-
-  <div id="touchPad"><div id="touchKnob"></div></div>
-  <div id="touchZoom">
-    <button id="touchPlus">+</button>
-    <button id="touchMinus">−</button>
-    <button id="touchMenu">MENU</button>
-  </div>
 </div>
 
 <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js" charset="utf-8"></script>
@@ -348,14 +306,12 @@
     surveyIndex: 0,
     targetIndex: 0,
     grid: false,
+    hudVisible: false,
     menuOpen: false,
     menuIndex: 0,
     ready: false,
     lastSend: 0,
     keys: new Set(),
-    touchX: 0,
-    touchY: 0,
-    touchZoom: 0,
     padName: '',
     lastNav: 0,
     lastEdit: 0,
@@ -365,6 +321,7 @@
   const $ = (id) => document.getElementById(id);
   const menuEl = $('menu');
   const menuRowsEl = $('menuRows');
+  const microHudEl = $('microHud');
   const toastEl = $('toast');
 
   let leftAladin = null;
@@ -376,9 +333,10 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v02') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v03') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
+
     state.ra = wrapRa(Number(state.ra) || targets[0].ra);
     state.dec = clamp(Number(state.dec) || targets[0].dec, -89.9, 89.9);
     state.fov = clamp(Number(state.fov) || targets[0].fov, 0.01, 180);
@@ -387,10 +345,11 @@
     state.surveyIndex = clamp(Number(state.surveyIndex) || 0, 0, surveys.length - 1);
     state.targetIndex = clamp(Number(state.targetIndex) || 0, 0, targets.length - 1);
     state.grid = !!state.grid;
+    state.hudVisible = !!state.hudVisible;
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v02', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v03', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -398,7 +357,8 @@
       eyeGap: state.eyeGap,
       surveyIndex: state.surveyIndex,
       targetIndex: state.targetIndex,
-      grid: state.grid
+      grid: state.grid,
+      hudVisible: state.hudVisible
     }));
   }
 
@@ -411,20 +371,55 @@
   }
 
   function toast(msg) {
+    if (state.menuOpen) return;
     toastEl.textContent = msg;
     toastEl.classList.add('show');
     clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => toastEl.classList.remove('show'), 900);
+    state.toastTimer = setTimeout(() => toastEl.classList.remove('show'), 800);
   }
 
   function updateHud() {
-    $('targetName').textContent = targets[state.targetIndex]?.name || 'Custom';
-    $('raTxt').textContent = state.ra.toFixed(3);
-    $('decTxt').textContent = state.dec.toFixed(3);
-    $('fovTxt').textContent = state.fov.toFixed(2) + '°';
-    $('gapTxt').textContent = state.eyeGap.toFixed(0) + ' px';
-    $('layerTxt').textContent = surveys[state.surveyIndex].name;
-    $('padTxt').textContent = state.padName ? '🎮 ' + state.padName.slice(0, 26) : '🎮 —';
+    microHudEl.textContent =
+      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · ${surveys[state.surveyIndex].name}` +
+      (state.padName ? ` · 🎮 ${state.padName.slice(0, 22)}` : '');
+    microHudEl.classList.toggle('visible', !!state.hudVisible);
+  }
+
+  function hideAladinChrome(root) {
+    if (!root) return;
+
+    const selectors = [
+      'button', 'select', 'input', 'textarea', 'label', 'a',
+      '.aladin-location', '.aladin-fov', '.aladin-frameChoice', '.aladin-frame-choice',
+      '.aladin-cooFrame', '.aladin-coordinates', '.aladin-coordinate', '.aladin-cm',
+      '.aladin-layerBox', '.aladin-layer-box', '.aladin-layersControl', '.aladin-layers-control',
+      '.aladin-stack-control', '.aladin-toolbar', '.aladin-statusBar', '.aladin-status-bar',
+      '.aladin-logo', '.aladin-share', '.aladin-fullscreen', '.aladin-projection',
+      '.aladin-grid', '.aladin-reticleColor', '.aladin-context-menu', '.aladin-popup',
+      '.aladin-tooltip', '.aladin-measurement-table'
+    ];
+
+    root.querySelectorAll(selectors.join(',')).forEach(el => {
+      el.style.setProperty('display', 'none', 'important');
+      el.style.setProperty('visibility', 'hidden', 'important');
+      el.style.setProperty('pointer-events', 'none', 'important');
+      el.style.setProperty('opacity', '0', 'important');
+      el.setAttribute('aria-hidden', 'true');
+      el.tabIndex = -1;
+    });
+  }
+
+  function installChromeCleaner() {
+    const roots = [$('left'), $('right')];
+
+    const clean = () => roots.forEach(hideAladinChrome);
+    clean();
+    setInterval(clean, 900);
+
+    roots.forEach(root => {
+      const obs = new MutationObserver(clean);
+      obs.observe(root, { childList: true, subtree: true, attributes: true });
+    });
   }
 
   function syncView(force = false) {
@@ -432,11 +427,12 @@
       updateHud();
       return;
     }
+
     const now = performance.now();
     if (!force && now - state.lastSend < 55) return;
     state.lastSend = now;
 
-    // Exact same metrics for both eyes: no parallax, no RA/Dec offset, no FoV offset.
+    // Both eyes receive exactly the same metrics.
     const commonRa = state.ra;
     const commonDec = state.dec;
     const commonFov = state.fov;
@@ -455,40 +451,49 @@
   }
 
   function setSurvey(index) {
-    state.surveyIndex = clamp(index, 0, surveys.length - 1);
+    state.surveyIndex = (index + surveys.length) % surveys.length;
     const survey = surveys[state.surveyIndex];
+
     for (const al of [leftAladin, rightAladin]) {
       if (!al) continue;
       try { al.setImageLayer(survey.id); } catch (e) { console.warn(e); }
     }
+
     toast('Шар: ' + survey.name);
     updateHud();
     renderMenu();
     saveState();
   }
 
-  function nextSurvey(dir = 1) {
-    setSurvey((state.surveyIndex + dir + surveys.length) % surveys.length);
-  }
-
   function goTarget(index) {
     state.targetIndex = (index + targets.length) % targets.length;
     const t = targets[state.targetIndex];
+
     state.ra = wrapRa(t.ra);
     state.dec = clamp(t.dec, -89.9, 89.9);
     state.fov = clamp(t.fov, 0.01, 180);
-    toast('Об’єкт: ' + t.name);
+
+    toast(t.name);
     syncView(true);
     renderMenu();
   }
 
   function toggleGrid() {
     state.grid = !state.grid;
+
     for (const al of [leftAladin, rightAladin]) {
       if (!al) continue;
       try { al.setCooGrid(state.grid); } catch (e) { console.warn(e); }
     }
-    toast(state.grid ? 'Сітку увімкнено' : 'Сітку вимкнено');
+
+    toast(state.grid ? 'Сітка: on' : 'Сітка: off');
+    renderMenu();
+    saveState();
+  }
+
+  function toggleHud() {
+    state.hudVisible = !state.hudVisible;
+    updateHud();
     renderMenu();
     saveState();
   }
@@ -500,10 +505,12 @@
     } catch (e) {
       console.warn(e);
     }
+    renderMenu();
   }
 
   function openMenu() {
     state.menuOpen = true;
+    toastEl.classList.remove('show');
     menuEl.classList.add('open');
     menuEl.setAttribute('aria-hidden', 'false');
     renderMenu();
@@ -513,10 +520,6 @@
     state.menuOpen = false;
     menuEl.classList.remove('open');
     menuEl.setAttribute('aria-hidden', 'true');
-  }
-
-  function toggleMenu() {
-    state.menuOpen ? closeMenu() : openMenu();
   }
 
   const menuSchema = [
@@ -537,8 +540,8 @@
       name: 'Шар',
       value: () => surveys[state.surveyIndex].name,
       hint: '← →',
-      edit: dir => nextSurvey(dir),
-      action: () => nextSurvey(1)
+      edit: dir => setSurvey(state.surveyIndex + dir),
+      action: () => setSurvey(state.surveyIndex + 1)
     },
     {
       name: 'Швидкість',
@@ -546,37 +549,42 @@
       hint: '← →',
       edit: dir => {
         state.speed = clamp(Math.round((state.speed + dir * 0.05) * 100) / 100, 0.05, 5);
-        toast('Швидкість: ' + state.speed.toFixed(2) + '×');
-        updateHud(); renderMenu(); saveState();
+        updateHud();
+        renderMenu();
+        saveState();
       }
     },
     {
-      name: 'FoV / масштаб',
+      name: 'FoV',
       value: () => state.fov.toFixed(2) + '°',
       hint: '← →',
       edit: dir => {
         state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180);
-        syncView(true); renderMenu();
+        syncView(true);
+        renderMenu();
       }
     },
     {
       name: 'Eye gap',
       value: () => state.eyeGap.toFixed(0) + ' px',
       hint: '← →',
-      edit: dir => {
-        setEyeGap(state.eyeGap + dir * 2);
-        toast('Відстань між картинками: ' + state.eyeGap.toFixed(0) + ' px');
-      }
+      edit: dir => setEyeGap(state.eyeGap + dir * 2)
     },
     {
-      name: 'Коорд. сітка',
-      value: () => state.grid ? 'увімкнено' : 'вимкнено',
+      name: 'Сітка',
+      value: () => state.grid ? 'on' : 'off',
       hint: 'A',
       action: () => toggleGrid()
     },
     {
+      name: 'Micro HUD',
+      value: () => state.hudVisible ? 'on' : 'off',
+      hint: 'A',
+      action: () => toggleHud()
+    },
+    {
       name: 'Fullscreen',
-      value: () => document.fullscreenElement ? 'увімкнено' : 'вимкнено',
+      value: () => document.fullscreenElement ? 'on' : 'off',
       hint: 'A',
       action: () => fullscreen()
     },
@@ -587,13 +595,17 @@
       action: () => {
         state.speed = 0.55;
         setEyeGap(8);
-        toast('VR-параметри скинуто');
+        state.hudVisible = false;
+        updateHud();
+        renderMenu();
+        saveState();
       }
     }
   ];
 
   function renderMenu() {
     if (!state.menuOpen) return;
+
     menuRowsEl.innerHTML = '';
     menuSchema.forEach((row, i) => {
       const div = document.createElement('div');
@@ -603,11 +615,6 @@
         <div class="value">${row.value()}</div>
         <div class="hint">${row.hint || ''}</div>
       `;
-      div.addEventListener('click', () => {
-        state.menuIndex = i;
-        if (row.action) row.action();
-        renderMenu();
-      });
       menuRowsEl.appendChild(div);
     });
   }
@@ -645,28 +652,40 @@
         showZoomControl: false,
         showFullscreenControl: false,
         showShareControl: false,
-        showSimbadPointerControl: false
+        showSimbadPointerControl: false,
+        showContextMenu: false,
+        showFrame: false,
+        showCooGrid: state.grid
       };
 
       leftAladin = A.aladin('#left', opts);
       rightAladin = A.aladin('#right', opts);
       state.ready = true;
 
+      installChromeCleaner();
       setEyeGap(state.eyeGap);
       setSurvey(state.surveyIndex);
-      setTimeout(() => syncView(true), 700);
+
+      setTimeout(() => {
+        hideAladinChrome($('left'));
+        hideAladinChrome($('right'));
+        syncView(true);
+      }, 700);
+
       requestAnimationFrame(loop);
     });
   }
 
   function keyboardVector() {
     let x = 0, y = 0, z = 0;
+
     if (state.keys.has('arrowleft') || state.keys.has('a')) x -= 1;
     if (state.keys.has('arrowright') || state.keys.has('d')) x += 1;
     if (state.keys.has('arrowup') || state.keys.has('w')) y -= 1;
     if (state.keys.has('arrowdown') || state.keys.has('s')) y += 1;
     if (state.keys.has('+') || state.keys.has('=') || state.keys.has('pageup')) z -= 1;
     if (state.keys.has('-') || state.keys.has('_') || state.keys.has('pagedown')) z += 1;
+
     return { x, y, z };
   }
 
@@ -698,6 +717,7 @@
 
   function gamepadVector(now) {
     const pad = getPad();
+
     if (!pad) {
       state.padName = '';
       return { x: 0, y: 0, z: 0 };
@@ -707,7 +727,6 @@
 
     const lx = axis(pad, 0);
     const ly = axis(pad, 1);
-    const rx = axis(pad, 2);
     const ry = axis(pad, 3);
 
     const dLeft = buttonPressed(pad, 14) ? -1 : 0;
@@ -723,6 +742,7 @@
         state.lastNav = now;
         menuMove(navY);
       }
+
       if (editX && now - state.lastEdit > 95) {
         state.lastEdit = now;
         menuEdit(editX);
@@ -730,20 +750,20 @@
 
       if (edgeButton(pad, 0)) menuAction(); // A
       if (edgeButton(pad, 1)) closeMenu();  // B
+
       return { x: 0, y: 0, z: 0 };
     }
 
     if (edgeButton(pad, 0)) openMenu();       // A
     if (edgeButton(pad, 1)) toggleGrid();     // B
-    if (edgeButton(pad, 2)) nextSurvey(-1);   // X
-    if (edgeButton(pad, 3)) nextSurvey(1);    // Y
-    if (edgeButton(pad, 8)) openMenu();       // Select/Back
-    if (edgeButton(pad, 9)) fullscreen();     // Start
-    if (edgeButton(pad, 4)) { state.fov = clamp(state.fov * 0.82, 0.01, 180); syncView(true); } // LB
-    if (edgeButton(pad, 5)) { state.fov = clamp(state.fov * 1.22, 0.01, 180); syncView(true); } // RB
+    if (edgeButton(pad, 2)) setSurvey(state.surveyIndex - 1); // X
+    if (edgeButton(pad, 3)) setSurvey(state.surveyIndex + 1); // Y
+    if (edgeButton(pad, 4)) goTarget(state.targetIndex - 1);  // LB
+    if (edgeButton(pad, 5)) goTarget(state.targetIndex + 1);  // RB
+    if (edgeButton(pad, 8)) toggleHud();       // Select/Back
+    if (edgeButton(pad, 9)) fullscreen();      // Start
 
-    // Right stick Y and triggers are zoom. Right stick X intentionally unused now.
-    let z = ry + buttonValue(pad, 6) - buttonValue(pad, 7);
+    let z = ry + buttonValue(pad, 6) - buttonValue(pad, 7); // right stick + LT/RT
 
     return {
       x: clamp(lx + dLeft + dRight, -1, 1),
@@ -761,9 +781,9 @@
     const k = keyboardVector();
     const g = gamepadVector(now);
 
-    let x = clamp(k.x + g.x + state.touchX, -1, 1);
-    let y = clamp(k.y + g.y + state.touchY, -1, 1);
-    let z = clamp(k.z + g.z + state.touchZoom, -1.5, 1.5);
+    let x = clamp(k.x + g.x, -1, 1);
+    let y = clamp(k.y + g.y, -1, 1);
+    let z = clamp(k.z + g.z, -1.5, 1.5);
 
     if (Math.abs(x) + Math.abs(y) + Math.abs(z) < 0.001) {
       updateHud();
@@ -786,8 +806,10 @@
 
   function loop(t) {
     if (!loop.last) loop.last = t;
+
     const dt = Math.min(0.08, (t - loop.last) / 1000);
     loop.last = t;
+
     applyMovement(dt, t);
     requestAnimationFrame(loop);
   }
@@ -808,59 +830,32 @@
 
     state.keys.add(key);
 
-    if (['arrowup','arrowdown','arrowleft','arrowright',' ','+','-','=','_','pageup','pagedown'].includes(key)) e.preventDefault();
+    if (['arrowup','arrowdown','arrowleft','arrowright',' ','+','-','=','_','pageup','pagedown'].includes(key)) {
+      e.preventDefault();
+    }
 
     if (key === 'enter' || key === ' ') {
       openMenu();
       e.preventDefault();
     }
+
+    if (key === 'h') toggleHud();
     if (key === 'g') toggleGrid();
-    if (key === 'q') nextSurvey(-1);
-    if (key === 'e') nextSurvey(1);
-    if (key >= '1' && key <= String(targets.length)) goTarget(Number(key) - 1);
+    if (key === 'q') setSurvey(state.surveyIndex - 1);
+    if (key === 'e') setSurvey(state.surveyIndex + 1);
   });
 
   window.addEventListener('keyup', (e) => state.keys.delete(e.key.toLowerCase()));
 
   window.addEventListener('gamepadconnected', e => {
     state.padName = e.gamepad.id || 'gamepad';
-    toast('Джойстик підключено');
     updateHud();
   });
 
   window.addEventListener('gamepaddisconnected', () => {
     state.padName = '';
-    toast('Джойстик відключено');
     updateHud();
   });
-
-  // Touch fallback, useful on phone if controller is not connected yet.
-  const touchPad = $('touchPad');
-  const touchKnob = $('touchKnob');
-  function setKnob(x, y) {
-    touchKnob.style.left = `${46 + x * 46}px`;
-    touchKnob.style.top = `${46 + y * 46}px`;
-  }
-  function handleTouchPad(e) {
-    const r = touchPad.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    let x = (e.clientX - cx) / (r.width * 0.35);
-    let y = (e.clientY - cy) / (r.height * 0.35);
-    const len = Math.hypot(x, y);
-    if (len > 1) { x /= len; y /= len; }
-    state.touchX = x;
-    state.touchY = y;
-    setKnob(x, y);
-  }
-  touchPad.addEventListener('pointerdown', e => { touchPad.setPointerCapture(e.pointerId); handleTouchPad(e); });
-  touchPad.addEventListener('pointermove', handleTouchPad);
-  touchPad.addEventListener('pointerup', () => { state.touchX = 0; state.touchY = 0; setKnob(0, 0); });
-  $('touchPlus').addEventListener('pointerdown', () => state.touchZoom = -1);
-  $('touchPlus').addEventListener('pointerup', () => state.touchZoom = 0);
-  $('touchMinus').addEventListener('pointerdown', () => state.touchZoom = 1);
-  $('touchMinus').addEventListener('pointerup', () => state.touchZoom = 0);
-  $('touchMenu').addEventListener('click', toggleMenu);
 
   loadState();
   setEyeGap(state.eyeGap);

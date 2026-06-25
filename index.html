@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.2</title>
+  <title>Sky Cardboard VR v0.3.3</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -274,8 +274,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.2</h1>
-      <div class="sub">Виправлена версія: джойстик працює і в меню, і в режимі перегляду. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.3</h1>
+      <div class="sub">Спрощена версія: X/Y напряму змінюють Eye gap без меню. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -344,7 +344,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v032') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v033') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -360,7 +360,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v032', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v033', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -379,6 +379,11 @@
     updateHud();
     renderMenu();
     saveState();
+  }
+
+  function changeEyeGap(delta) {
+    setEyeGap(state.eyeGap + delta);
+    toast('Eye gap: ' + state.eyeGap.toFixed(0) + ' px');
   }
 
   function toast(msg) {
@@ -668,8 +673,8 @@
 
     if (edgeButton(pad, 0)) openMenu();
     if (edgeButton(pad, 1)) toggleGrid();
-    if (edgeButton(pad, 2)) setSurvey(state.surveyIndex - 1);
-    if (edgeButton(pad, 3)) setSurvey(state.surveyIndex + 1);
+    if (edgeButton(pad, 2)) changeEyeGap(-2); // X: smaller eye gap
+    if (edgeButton(pad, 3)) changeEyeGap(2);  // Y: larger eye gap
     if (edgeButton(pad, 4)) goTarget(state.targetIndex - 1);
     if (edgeButton(pad, 5)) goTarget(state.targetIndex + 1);
     if (edgeButton(pad, 8)) toggleHud();
@@ -754,6 +759,8 @@
 
     if (key === 'h') toggleHud();
     if (key === 'g') toggleGrid();
+    if (key === 'x') changeEyeGap(-2);
+    if (key === 'y') changeEyeGap(2);
     if (key === 'q') setSurvey(state.surveyIndex - 1);
     if (key === 'e') setSurvey(state.surveyIndex + 1);
   });

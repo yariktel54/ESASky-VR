@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.7</title>
+  <title>Sky Cardboard VR v0.3.5</title>
   <style>
     :root {
       --eye-gap: 8px;
-      --render-scale: 1.5;
       --panel: rgba(18,18,18,.92);
       --line: rgba(255,255,255,.22);
       --text: #f5f5f5;
@@ -45,17 +44,10 @@
     }
 
     .viewer {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: calc(100% * var(--render-scale));
-      height: calc(100% * var(--render-scale));
-      transform: translate(-50%, -50%) scale(calc(1 / var(--render-scale)));
-      transform-origin: center center;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       background: #000;
-      filter: contrast(1.06) saturate(1.04);
-      will-change: transform;
     }
 
     .mask {
@@ -288,8 +280,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.7</h1>
-      <div class="sub">Версія з регульованою якістю: render scale 1.5×, стандартний шар DSS2 color. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.5</h1>
+      <div class="sub">Версія з тимчасовим кросхейром: він з’являється тільки при зміні Parallax або Eye gap. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -329,7 +321,6 @@
     speed: 0.55,
     eyeGap: 8,
     parallax: 0.012,
-    renderScale: 1.5,
     surveyIndex: 0,
     targetIndex: 0,
     grid: false,
@@ -361,7 +352,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v037') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v035') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -371,7 +362,6 @@
     state.speed = clamp(Number(state.speed) || 0.55, 0.05, 5);
     state.eyeGap = clamp(Number(state.eyeGap) || 8, 0, 160);
     state.parallax = clamp(Number.isFinite(Number(state.parallax)) ? Number(state.parallax) : 0.012, -0.06, 0.06);
-    state.renderScale = clamp(Number.isFinite(Number(state.renderScale)) ? Number(state.renderScale) : 1.5, 1, 2.25);
     state.surveyIndex = clamp(Number(state.surveyIndex) || 0, 0, surveys.length - 1);
     state.targetIndex = clamp(Number(state.targetIndex) || 0, 0, targets.length - 1);
     state.grid = !!state.grid;
@@ -379,14 +369,13 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v037', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v035', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
       speed: state.speed,
       eyeGap: state.eyeGap,
       parallax: state.parallax,
-      renderScale: state.renderScale,
       surveyIndex: state.surveyIndex,
       targetIndex: state.targetIndex,
       grid: state.grid,
@@ -400,24 +389,6 @@
     state.crosshairTimer = setTimeout(() => {
       document.querySelectorAll('.crosshair').forEach(el => el.classList.remove('active'));
     }, 2000);
-  }
-
-  function setRenderScale(scale) {
-    state.renderScale = clamp(Number(scale) || 1.5, 1, 2.25);
-    document.documentElement.style.setProperty('--render-scale', state.renderScale);
-    updateHud();
-    renderMenu();
-    saveState();
-
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-      syncView(true);
-    }, 60);
-  }
-
-  function changeRenderScale(delta) {
-    setRenderScale(Math.round((state.renderScale + delta) * 4) / 4);
-    toast('Quality: ' + state.renderScale.toFixed(2) + '×');
   }
 
   function setEyeGap(px) {
@@ -454,7 +425,7 @@
 
   function updateHud() {
     microHudEl.textContent =
-      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · Parallax ${(state.parallax*100).toFixed(1)}% · Q ${state.renderScale.toFixed(2)}× · ${surveys[state.surveyIndex].name}` +
+      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · Parallax ${(state.parallax*100).toFixed(1)}% · ${surveys[state.surveyIndex].name}` +
       (state.padName ? ` · 🎮 ${state.padName.slice(0, 22)}` : '');
     microHudEl.classList.toggle('visible', !!state.hudVisible);
   }
@@ -589,11 +560,10 @@
     { name: 'FoV', value: () => state.fov.toFixed(2) + '°', hint: '← →', edit: dir => { state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180); syncView(true); renderMenu(); } },
     { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => changeEyeGap(dir * 2) },
     { name: 'Parallax', value: () => (state.parallax * 100).toFixed(1) + '%', hint: '← →', edit: dir => changeParallax(dir * 0.002) },
-    { name: 'Render scale', value: () => state.renderScale.toFixed(2) + '×', hint: '← →', edit: dir => changeRenderScale(dir * 0.25) },
     { name: 'Сітка', value: () => state.grid ? 'on' : 'off', hint: 'A', action: () => toggleGrid() },
     { name: 'Micro HUD', value: () => state.hudVisible ? 'on' : 'off', hint: 'A', action: () => toggleHud() },
     { name: 'Fullscreen', value: () => document.fullscreenElement ? 'on' : 'off', hint: 'A', action: () => fullscreen() },
-    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, Q 1.5×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.renderScale = 1.5; state.hudVisible = false; setEyeGap(8); setRenderScale(1.5); showCrosshair(); syncView(true); updateHud(); renderMenu(); saveState(); } }
+    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.hudVisible = false; setEyeGap(8); showCrosshair(); syncView(true); updateHud(); renderMenu(); saveState(); } }
   ];
 
   function renderMenu() {
@@ -747,8 +717,6 @@
     if (edgeButton(pad, 5)) changeEyeGap(2);         // RB: larger eye gap
     if (edgeButton(pad, 8)) toggleHud();
     if (edgeButton(pad, 9)) fullscreen();
-    if (edgeButton(pad, 10)) changeRenderScale(-0.25); // L3: lower render quality
-    if (edgeButton(pad, 11)) changeRenderScale(0.25);  // R3: higher render quality
 
     const z = ry + buttonValue(pad, 6) - buttonValue(pad, 7);
 
@@ -833,8 +801,6 @@
     if (key === 'y') changeParallax(0.002);
     if (key === '[') changeEyeGap(-2);
     if (key === ']') changeEyeGap(2);
-    if (key === ',') changeRenderScale(-0.25);
-    if (key === '.') changeRenderScale(0.25);
     if (key === 'q') setSurvey(state.surveyIndex - 1);
     if (key === 'e') setSurvey(state.surveyIndex + 1);
   });
@@ -853,7 +819,6 @@
 
   loadState();
   setEyeGap(state.eyeGap);
-  setRenderScale(state.renderScale);
   updateHud();
   initAladin();
 })();

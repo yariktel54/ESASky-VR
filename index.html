@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.5</title>
+  <title>Sky Cardboard VR v0.3.5 Comfort</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -12,6 +12,7 @@
       --text: #f5f5f5;
       --muted: rgba(255,255,255,.68);
       --focus: rgba(255,255,255,.96);
+      --comfort-vignette: .38;
     }
 
     html, body {
@@ -54,7 +55,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.12) 74%, rgba(0,0,0,.56) 100%);
+      background: radial-gradient(ellipse at center, transparent 56%, rgba(0,0,0,.06) 78%, rgba(0,0,0,var(--comfort-vignette)) 100%);
     }
 
     .crosshair {
@@ -70,7 +71,7 @@
     }
 
     .crosshair.active {
-      opacity: .38;
+      opacity: .26;
       transition: opacity .08s linear;
     }
 
@@ -275,13 +276,13 @@
     </div>
   </div>
 
-  <div id="loading">Loading sky…</div>
+  <div id="loading">Loading comfort sky…</div>
   <div id="microHud"></div>
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.5</h1>
-      <div class="sub">Версія з тимчасовим кросхейром: він з’являється тільки при зміні Parallax або Eye gap. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.5 Comfort</h1>
+      <div class="sub">Comfort-версія: дуже малий паралакс, дрібні кроки налаштування і повільніший рух. Мета — мінімальна втома очей, а не максимальний 3D-ефект.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -318,9 +319,11 @@
     ra: targets[0].ra,
     dec: targets[0].dec,
     fov: targets[0].fov,
-    speed: 0.55,
+    speed: 0.35,
     eyeGap: 8,
-    parallax: 0.012,
+    parallax: 0.004,
+    comfortParallax: 0.004,
+    flatParallax: 0,
     surveyIndex: 0,
     targetIndex: 0,
     grid: false,
@@ -352,16 +355,16 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v035') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v035_comfort') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
     state.ra = wrapRa(Number(state.ra) || targets[0].ra);
     state.dec = clamp(Number(state.dec) || targets[0].dec, -89.9, 89.9);
     state.fov = clamp(Number(state.fov) || targets[0].fov, 0.01, 180);
-    state.speed = clamp(Number(state.speed) || 0.55, 0.05, 5);
-    state.eyeGap = clamp(Number(state.eyeGap) || 8, 0, 160);
-    state.parallax = clamp(Number.isFinite(Number(state.parallax)) ? Number(state.parallax) : 0.012, -0.06, 0.06);
+    state.speed = clamp(Number(state.speed) || 0.35, 0.05, 2.5);
+    state.eyeGap = clamp(Number(state.eyeGap) || 8, 0, 80);
+    state.parallax = clamp(Number.isFinite(Number(state.parallax)) ? Number(state.parallax) : 0.004, -0.02, 0.02);
     state.surveyIndex = clamp(Number(state.surveyIndex) || 0, 0, surveys.length - 1);
     state.targetIndex = clamp(Number(state.targetIndex) || 0, 0, targets.length - 1);
     state.grid = !!state.grid;
@@ -369,7 +372,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v035', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v035_comfort', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
@@ -392,7 +395,7 @@
   }
 
   function setEyeGap(px) {
-    state.eyeGap = clamp(Number(px) || 0, 0, 160);
+    state.eyeGap = clamp(Number(px) || 0, 0, 80);
     document.documentElement.style.setProperty('--eye-gap', state.eyeGap + 'px');
     updateHud();
     renderMenu();
@@ -406,13 +409,47 @@
   }
 
   function changeParallax(delta) {
-    state.parallax = clamp(state.parallax + delta, -0.06, 0.06);
+    state.parallax = clamp(state.parallax + delta, -0.02, 0.02);
     showCrosshair();
-    toast('Parallax: ' + (state.parallax * 100).toFixed(1) + '%');
+    toast('Parallax: ' + (state.parallax * 100).toFixed(2) + '%');
     updateHud();
     renderMenu();
     syncView(true);
     saveState();
+  }
+
+  function setParallax(value) {
+    state.parallax = clamp(Number(value) || 0, -0.02, 0.02);
+    showCrosshair();
+    toast('Parallax: ' + (state.parallax * 100).toFixed(2) + '%');
+    updateHud();
+    renderMenu();
+    syncView(true);
+    saveState();
+  }
+
+  function comfortReset() {
+    state.speed = 0.35;
+    state.parallax = 0.004;
+    state.eyeGap = 8;
+    state.hudVisible = false;
+    setEyeGap(state.eyeGap);
+    showCrosshair();
+    toast('Comfort reset');
+    syncView(true);
+    updateHud();
+    renderMenu();
+    saveState();
+  }
+
+  function toggleFlatSoft() {
+    if (Math.abs(state.parallax) > 0.0001) {
+      setParallax(0);
+      toast('Flat mode');
+    } else {
+      setParallax(0.004);
+      toast('Soft parallax');
+    }
   }
 
   function toast(msg) {
@@ -425,7 +462,7 @@
 
   function updateHud() {
     microHudEl.textContent =
-      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · Parallax ${(state.parallax*100).toFixed(1)}% · ${surveys[state.surveyIndex].name}` +
+      `RA ${state.ra.toFixed(3)} · Dec ${state.dec.toFixed(3)} · FoV ${state.fov.toFixed(2)}° · Gap ${state.eyeGap.toFixed(0)} px · Parallax ${(state.parallax*100).toFixed(2)}% · ${surveys[state.surveyIndex].name}` +
       (state.padName ? ` · 🎮 ${state.padName.slice(0, 22)}` : '');
     microHudEl.classList.toggle('visible', !!state.hudVisible);
   }
@@ -456,7 +493,7 @@
     }
 
     const now = performance.now();
-    if (!force && now - state.lastSend < 70) return;
+    if (!force && now - state.lastSend < 90) return;
     state.lastSend = now;
 
     const cosDec = Math.max(0.18, Math.cos(state.dec * Math.PI / 180));
@@ -556,14 +593,15 @@
     { name: 'Продовжити', value: () => 'закрити меню', hint: 'A', action: () => closeMenu() },
     { name: 'Об’єкт', value: () => targets[state.targetIndex].name, hint: '← →', edit: dir => goTarget(state.targetIndex + dir), action: () => goTarget(state.targetIndex + 1) },
     { name: 'Шар', value: () => surveys[state.surveyIndex].name, hint: '← →', edit: dir => setSurvey(state.surveyIndex + dir), action: () => setSurvey(state.surveyIndex + 1) },
-    { name: 'Швидкість', value: () => state.speed.toFixed(2) + '×', hint: '← →', edit: dir => { state.speed = clamp(Math.round((state.speed + dir * 0.05) * 100) / 100, 0.05, 5); updateHud(); renderMenu(); saveState(); } },
+    { name: 'Швидкість', value: () => state.speed.toFixed(2) + '×', hint: '← →', edit: dir => { state.speed = clamp(Math.round((state.speed + dir * 0.025) * 100) / 100, 0.05, 2.5); updateHud(); renderMenu(); saveState(); } },
     { name: 'FoV', value: () => state.fov.toFixed(2) + '°', hint: '← →', edit: dir => { state.fov = clamp(state.fov * (dir > 0 ? 1.08 : 0.925), 0.01, 180); syncView(true); renderMenu(); } },
-    { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => changeEyeGap(dir * 2) },
-    { name: 'Parallax', value: () => (state.parallax * 100).toFixed(1) + '%', hint: '← →', edit: dir => changeParallax(dir * 0.002) },
+    { name: 'Eye gap', value: () => state.eyeGap.toFixed(0) + ' px', hint: '← →', edit: dir => changeEyeGap(dir * 1) },
+    { name: 'Parallax', value: () => (state.parallax * 100).toFixed(2) + '%', hint: '← →', edit: dir => changeParallax(dir * 0.0005) },
+    { name: 'Flat / soft', value: () => Math.abs(state.parallax) > 0.0001 ? 'soft' : 'flat', hint: 'A', action: () => toggleFlatSoft() },
     { name: 'Сітка', value: () => state.grid ? 'on' : 'off', hint: 'A', action: () => toggleGrid() },
     { name: 'Micro HUD', value: () => state.hudVisible ? 'on' : 'off', hint: 'A', action: () => toggleHud() },
     { name: 'Fullscreen', value: () => document.fullscreenElement ? 'on' : 'off', hint: 'A', action: () => fullscreen() },
-    { name: 'Скинути VR', value: () => 'Gap 8 px, Parallax 1.2%, speed 0.55×', hint: 'A', action: () => { state.speed = 0.55; state.parallax = 0.012; state.hudVisible = false; setEyeGap(8); showCrosshair(); syncView(true); updateHud(); renderMenu(); saveState(); } }
+    { name: 'Comfort reset', value: () => 'Gap 8 px, Parallax 0.40%, speed 0.35×', hint: 'A', action: () => comfortReset() }
   ];
 
   function renderMenu() {
@@ -711,12 +749,14 @@
 
     if (edgeButton(pad, 0)) openMenu();
     if (edgeButton(pad, 1)) toggleGrid();
-    if (edgeButton(pad, 2)) changeParallax(-0.002); // X: less parallax
-    if (edgeButton(pad, 3)) changeParallax(0.002);  // Y: more parallax
-    if (edgeButton(pad, 4)) changeEyeGap(-2);        // LB: smaller eye gap
-    if (edgeButton(pad, 5)) changeEyeGap(2);         // RB: larger eye gap
+    if (edgeButton(pad, 2)) changeParallax(-0.0005); // X: less parallax, fine comfort step
+    if (edgeButton(pad, 3)) changeParallax(0.0005);  // Y: more parallax, fine comfort step
+    if (edgeButton(pad, 4)) changeEyeGap(-1);        // LB: smaller eye gap, fine step
+    if (edgeButton(pad, 5)) changeEyeGap(1);         // RB: larger eye gap, fine step
     if (edgeButton(pad, 8)) toggleHud();
     if (edgeButton(pad, 9)) fullscreen();
+    if (edgeButton(pad, 10)) comfortReset();          // L3: comfort reset
+    if (edgeButton(pad, 11)) toggleFlatSoft();        // R3: flat / soft parallax
 
     const z = ry + buttonValue(pad, 6) - buttonValue(pad, 7);
 
@@ -756,7 +796,7 @@
     state.dec = clamp(state.dec - y * step, -89.9, 89.9);
 
     if (Math.abs(z) > 0.001) {
-      state.fov = clamp(state.fov * Math.exp(z * dt * 1.4), 0.01, 180);
+      state.fov = clamp(state.fov * Math.exp(z * dt * 0.85), 0.01, 180);
     }
 
     syncView(false);
@@ -797,10 +837,12 @@
 
     if (key === 'h') toggleHud();
     if (key === 'g') toggleGrid();
-    if (key === 'x') changeParallax(-0.002);
-    if (key === 'y') changeParallax(0.002);
-    if (key === '[') changeEyeGap(-2);
-    if (key === ']') changeEyeGap(2);
+    if (key === 'x') changeParallax(-0.0005);
+    if (key === 'y') changeParallax(0.0005);
+    if (key === '[') changeEyeGap(-1);
+    if (key === ']') changeEyeGap(1);
+    if (key === 'c') comfortReset();
+    if (key === 'v') toggleFlatSoft();
     if (key === 'q') setSurvey(state.surveyIndex - 1);
     if (key === 'e') setSurvey(state.surveyIndex + 1);
   });

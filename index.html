@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Sky Cardboard VR v0.3.6</title>
+  <title>Sky Cardboard VR v0.3.7</title>
   <style>
     :root {
       --eye-gap: 8px;
@@ -288,8 +288,8 @@
 
   <div id="menu" aria-hidden="true">
     <div id="panel">
-      <h1>Sky Cardboard VR v0.3.6</h1>
-      <div class="sub">Версія з підвищеною чіткістю: render scale 1.5× і стартовий шар PanSTARRS DR1. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
+      <h1>Sky Cardboard VR v0.3.7</h1>
+      <div class="sub">Версія з регульованою якістю: render scale 1.5×, стандартний шар DSS2 color. Обидва ока показують одну й ту саму карту; Eye gap змінює тільки проміжок між половинами.</div>
       <div id="menuRows"></div>
       <div id="menuHelp">
         <span>↑↓ / D-pad — пункт</span>
@@ -330,7 +330,7 @@
     eyeGap: 8,
     parallax: 0.012,
     renderScale: 1.5,
-    surveyIndex: 3,
+    surveyIndex: 0,
     targetIndex: 0,
     grid: false,
     hudVisible: false,
@@ -361,7 +361,7 @@
 
   function loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v036') || '{}');
+      const saved = JSON.parse(localStorage.getItem('sky_cardboard_v037') || '{}');
       Object.assign(state, saved);
     } catch (_) {}
 
@@ -379,7 +379,7 @@
   }
 
   function saveState() {
-    localStorage.setItem('sky_cardboard_v036', JSON.stringify({
+    localStorage.setItem('sky_cardboard_v037', JSON.stringify({
       ra: state.ra,
       dec: state.dec,
       fov: state.fov,
